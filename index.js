@@ -5,36 +5,31 @@ const axios = require("axios");
 const app = express();
 app.use(bodyParser.json());
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-const SECRET = process.env.WEBHOOK_SECRET || null;
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-app.get("/", (req, res) => {
-  res.send("✅ TradingView → Telegram bot is running.");
-});
-
-app.post("/", async (req, res) => {
+app.post("/webhook", async (req, res) => {
   try {
-    if (SECRET && req.body.secret !== SECRET) {
-      return res.status(401).send("Unauthorized: wrong secret");
-    }
+    const { symbol, price, message } = req.body;
 
-    const message = req.body.message || "⚠️ No message content received.";
-    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+    const text = `
+📢 ${message}
+🔹 الزوج: ${symbol}
+💰 السعر: ${price}
+⏰ ${new Date().toLocaleString()}
+    `;
 
-    await axios.post(url, {
-      chat_id: CHAT_ID,
-      text: message,
-      parse_mode: "HTML",
-      disable_web_page_preview: true
+    await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      chat_id: TELEGRAM_CHAT_ID,
+      text,
+      parse_mode: "HTML"
     });
 
-    res.send("Message sent to Telegram ✅");
+    res.status(200).send("OK");
   } catch (error) {
-    console.error("Error:", error.response?.data || error.message);
+    console.error("Error sending message:", error.response ? error.response.data : error.message);
     res.status(500).send("Error sending message");
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+app.listen(3000, () => console.log("Server is running"));
