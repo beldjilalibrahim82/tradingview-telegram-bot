@@ -1,35 +1,32 @@
-const express = require("express");
-const bodyParser = require("body-parser");
-const axios = require("axios");
+import express from "express";
+import fetch from "node-fetch";
 
 const app = express();
-app.use(bodyParser.json());
+app.use(express.json());
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 app.post("/webhook", async (req, res) => {
   try {
-    const { symbol, price, message } = req.body;
+    const alertMessage = req.body; // TradingView alert JSON
+    console.log("Alert received:", alertMessage);
 
-    const text = `
-📢 ${message}
-🔹 الزوج: ${symbol}
-💰 السعر: ${price}
-⏰ ${new Date().toLocaleString()}
-    `;
-
-    await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      chat_id: TELEGRAM_CHAT_ID,
-      text,
-      parse_mode: "HTML"
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: `📢 إشعار جديد من TradingView:\n${JSON.stringify(alertMessage, null, 2)}`
+      }),
     });
 
-    res.status(200).send("OK");
+    res.status(200).send("Message sent to Telegram");
   } catch (error) {
-    console.error("Error sending message:", error.response ? error.response.data : error.message);
+    console.error(error);
     res.status(500).send("Error sending message");
   }
 });
 
-app.listen(3000, () => console.log("Server is running"));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
