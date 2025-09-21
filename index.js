@@ -4,40 +4,48 @@ import fetch from "node-fetch";
 const app = express();
 app.use(express.json());
 
-const BOT_TOKEN = (process.env.TELEGRAM_BOT_TOKEN || "").trim();
-const CHAT_ID   = (process.env.TELEGRAM_CHAT_ID || "").trim();
-const SECRET    = (process.env.WEBHOOK_SECRET || "").trim(); // اختياري
+// متغيرات البيئة
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-app.get("/", (_, res) => res.send("✅ TradingView → Telegram bot is running."));
-
+// ويبهوك يستقبل الرسائل من TradingView
 app.post("/webhook", async (req, res) => {
   try {
-    // تحقّق اختياري للسرّ
-    if (SECRET && (req.body?.secret || "").trim() !== SECRET) {
-      return res.status(401).json({ ok: false, description: "Unauthorized (bad secret)" });
+    const { message } = req.body;
+
+    if (!message) {
+      return res.status(400).send("Missing message field");
     }
 
-    const text = (req.body?.message || "📢 Test").toString();
+    const telegramUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
 
-    // أرسل لتليجرام
-    const tg = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    // إرسال الرسالة إلى تليجرام
+    const response = await fetch(telegramUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        chat_id: CHAT_ID,
-        text,
+        chat_id: TELEGRAM_CHAT_ID,
+        text: message,
         parse_mode: "HTML",
-        disable_web_page_preview: true
-      })
+      }),
     });
 
-    const result = await tg.json();
-    // رجّع رد تيليجرام كما هو لسهولة التشخيص
-    return res.status(result.ok ? 200 : 500).json(result);
-  } catch (e) {
-    return res.status(500).json({ ok: false, description: e.message });
+    const data = await response.json();
+
+    if (!data.ok) {
+      console.error("Telegram error:", data);
+      return res.status(500).send("Failed to send message to Telegram");
+    }
+
+    res.status(200).send("Message sent to Telegram ✅");
+  } catch (err) {
+    console.error("Server error:", err);
+    res.status(500).send("Internal Server Error");
   }
 });
 
+// تشغيل السيرفر
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server on ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
