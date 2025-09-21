@@ -4,30 +4,40 @@ import fetch from "node-fetch";
 const app = express();
 app.use(express.json());
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const BOT_TOKEN = (process.env.TELEGRAM_BOT_TOKEN || "").trim();
+const CHAT_ID   = (process.env.TELEGRAM_CHAT_ID || "").trim();
+const SECRET    = (process.env.WEBHOOK_SECRET || "").trim(); // اختياري
+
+app.get("/", (_, res) => res.send("✅ TradingView → Telegram bot is running."));
 
 app.post("/webhook", async (req, res) => {
   try {
-    const text = req.body.message || "📢 Test";
-    const tgResp = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    // تحقّق اختياري للسرّ
+    if (SECRET && (req.body?.secret || "").trim() !== SECRET) {
+      return res.status(401).json({ ok: false, description: "Unauthorized (bad secret)" });
+    }
+
+    const text = (req.body?.message || "📢 Test").toString();
+
+    // أرسل لتليجرام
+    const tg = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        chat_id: TELEGRAM_CHAT_ID,
+        chat_id: CHAT_ID,
         text,
         parse_mode: "HTML",
         disable_web_page_preview: true
       })
     });
 
-    const result = await tgResp.json();
-    // نرجّع النتيجة كما هي باش تشوفها في ReqBin
-    return res.status(tgResp.ok ? 200 : 500).json(result);
+    const result = await tg.json();
+    // رجّع رد تيليجرام كما هو لسهولة التشخيص
+    return res.status(result.ok ? 200 : 500).json(result);
   } catch (e) {
-    return res.status(500).json({ ok: false, error: e.message });
+    return res.status(500).json({ ok: false, description: e.message });
   }
 });
 
-app.get("/", (_, res) => res.send("✅ Bot is running"));
-app.listen(process.env.PORT || 3000);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Server on ${PORT}`));
